@@ -41,6 +41,7 @@
             border-radius: 20px;
             padding: 30px;
             box-shadow: 0 10px 30px rgba(212, 86, 125, 0.1);
+            margin-bottom: 20px;
         }
 
         .button {
@@ -124,6 +125,30 @@
             gap: 10px;
         }
 
+        .stars-container {
+            max-height: 180px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .stars-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .stars-container::-webkit-scrollbar-track {
+            background: #fff5f9;
+            border-radius: 10px;
+        }
+
+        .stars-container::-webkit-scrollbar-thumb {
+            background: #e88ca7;
+            border-radius: 10px;
+        }
+
+        .stars-container::-webkit-scrollbar-thumb:hover {
+            background: #d4567d;
+        }
+
         .star-item {
             background: #fff5f9;
             padding: 15px 20px;
@@ -147,11 +172,87 @@
             }
         }
 
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ffd4e5;
+        }
+
+        .pagination button {
+            padding: 8px 15px;
+            border: 2px solid #e88ca7;
+            background: white;
+            color: #d4567d;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #e88ca7;
+            color: white;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .pagination input {
+            width: 50px;
+            padding: 8px;
+            border: 2px solid #ffd4e5;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .pagination span {
+            color: #d4567d;
+            font-size: 0.9em;
+        }
+
+        .backup-section {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .backup-button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 15px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            background: linear-gradient(135deg, #e88ca7 0%, #d4567d 100%);
+            color: white;
+        }
+
+        .backup-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(212, 86, 125, 0.3);
+        }
+
         .footer {
-            margin-top: 30px;
+            margin-top: 10px;
+            margin-bottom: 30px;
             text-align: center;
             color: #d4567d;
             line-height: 1.8;
+        }
+
+        #fileInput {
+            display: none;
         }
     </style>
 </head>
@@ -184,8 +285,19 @@
             <div class="stars-title">
                 💫 Yuki 留下的星星
             </div>
-            <div id="starsList"></div>
+            <div class="stars-container" id="starsList"></div>
+            <div class="pagination" id="pagination"></div>
         </div>
+    </div>
+
+    <div class="backup-section">
+        <button class="backup-button" onclick="backupData()">
+            🐺 备份数据
+        </button>
+        <button class="backup-button" onclick="document.getElementById('fileInput').click()">
+            🐱 恢复数据
+        </button>
+        <input type="file" id="fileInput" accept=".json" onchange="restoreData(event)">
     </div>
 
     <div class="footer">
@@ -206,6 +318,9 @@
             "你的感受对我很重要。",
             "我会记住你说的每一句话。"
         ];
+
+        let currentPage = 1;
+        const itemsPerPage = 15;
 
         // 页面加载时读取保存的留言
         window.onload = function() {
@@ -245,6 +360,9 @@
             // 清空输入框
             document.getElementById('userMessage').value = '';
 
+            // 重置到第一页
+            currentPage = 1;
+
             // 重新加载星星列表
             loadStars();
 
@@ -252,19 +370,112 @@
             alert('💫 你的话已经变成星星啦！');
         }
 
-        function loadStars() {
+        function loadStars(page = 1) {
             const starsList = document.getElementById('starsList');
+            const pagination = document.getElementById('pagination');
             const stars = JSON.parse(localStorage.getItem('yukiStars') || '[]');
 
             if (stars.length === 0) {
                 starsList.innerHTML = '<div class="star-item">💫 想你！</div>';
+                pagination.innerHTML = '';
                 return;
             }
 
-            // 显示所有留言（最新的在上面）
-            starsList.innerHTML = stars.reverse().map(star => 
+            // 反转数组，最新的在前面
+            const reversedStars = [...stars].reverse();
+            
+            // 计算总页数
+            const totalPages = Math.ceil(reversedStars.length / itemsPerPage);
+            currentPage = Math.min(page, totalPages);
+
+            // 获取当前页的留言
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const currentStars = reversedStars.slice(startIndex, endIndex);
+
+            // 显示当前页的留言
+            starsList.innerHTML = currentStars.map(star => 
                 `<div class="star-item">💫 ${star.message}</div>`
             ).join('');
+
+            // 显示分页控件
+            if (totalPages > 1) {
+                pagination.innerHTML = `
+                    <button onclick="changePage(\({currentPage - 1})" \){currentPage === 1 ? 'disabled' : ''}>
+                        上一页
+                    </button>
+                    <input type="number" 
+                           id="pageInput" 
+                           value="${currentPage}" 
+                           min="1" 
+                           max="${totalPages}"
+                           onchange="jumpToPage(this.value, ${totalPages})">
+                    <span>/ ${totalPages}</span>
+                    <button onclick="changePage(\({currentPage + 1})" \){currentPage === totalPages ? 'disabled' : ''}>
+                        下一页
+                    </button>
+                `;
+            } else {
+                pagination.innerHTML = '';
+            }
+        }
+
+        function changePage(page) {
+            loadStars(page);
+        }
+
+        function jumpToPage(page, totalPages) {
+            page = parseInt(page);
+            if (page >= 1 && page <= totalPages) {
+                loadStars(page);
+            } else {
+                alert(`请输入 1 到 ${totalPages} 之间的页码`);
+                document.getElementById('pageInput').value = currentPage;
+            }
+        }
+
+        function backupData() {
+            const stars = localStorage.getItem('yukiStars') || '[]';
+            const dataStr = JSON.stringify(JSON.parse(stars), null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `yuki-stars-backup-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            
+            alert('🐺 数据备份成功！文件已下载～');
+        }
+
+        function restoreData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    // 验证数据格式
+                    if (!Array.isArray(data)) {
+                        throw new Error('数据格式不正确');
+                    }
+
+                    // 确认是否覆盖
+                    if (confirm('🐱 确定要恢复数据吗？这会覆盖当前的所有留言哦～')) {
+                        localStorage.setItem('yukiStars', JSON.stringify(data));
+                        currentPage = 1;
+                        loadStars();
+                        alert('🐱 数据恢复成功！所有留言都回来啦～');
+                    }
+                } catch (error) {
+                    alert('❌ 文件格式错误，请选择正确的备份文件～');
+                }
+            };
+            reader.readAsText(file);
+            
+            // 清空文件选择，允许重复选择同一文件
+            event.target.value = '';
         }
     </script>
 </body>
